@@ -8,6 +8,9 @@ import rtmidi
 import music21 as m21
 from random import random
 from typing import Dict, List
+from pedalboard import load_plugin
+from pedalboard.io import AudioFile
+from mido import Message
 
 """
 This file is used to generate a chords dataset in WAV format.
@@ -16,7 +19,6 @@ Then the chords are sent in a midi channel to the virtual instrument.
 For example a VSTI piano is listening to MIDI channel 1.
 The sound produced by the VSTI is captured and saved as WAV file.
 """
-
 
 # list of channels to send midi message to in order to capture the sound
 CHANNELS = [
@@ -27,8 +29,10 @@ CHANNELS = [
     {"name": "violins", "lowest_note": m21.pitch.Pitch("G3"), "highest_note": m21.pitch.Pitch("G6"), "chords": []},
     {"name": "bigband", "lowest_note": m21.pitch.Pitch("D3"), "highest_note": m21.pitch.Pitch("A5"), "chords": []},
     {"name": "nylonguitar", "lowest_note": m21.pitch.Pitch("E2"), "highest_note": m21.pitch.Pitch("C6"), "chords": []},
-    {"name": "accordionbasson", "lowest_note": m21.pitch.Pitch("F3"), "highest_note": m21.pitch.Pitch("A6"),"chords": []},
-    {"name": "accordionviolin", "lowest_note": m21.pitch.Pitch("F3"), "highest_note": m21.pitch.Pitch("A6"),"chords": []},
+    {"name": "accordionbasson", "lowest_note": m21.pitch.Pitch("F3"), "highest_note": m21.pitch.Pitch("A6"),
+     "chords": []},
+    {"name": "accordionviolin", "lowest_note": m21.pitch.Pitch("F3"), "highest_note": m21.pitch.Pitch("A6"),
+     "chords": []},
     {"name": "trumpet", "lowest_note": m21.pitch.Pitch("A3"), "highest_note": m21.pitch.Pitch("G5"), "chords": []},
     {"name": "bassguitar", "lowest_note": m21.pitch.Pitch("B0"), "highest_note": m21.pitch.Pitch("A3"), "chords": []},
     {"name": "clarinet", "lowest_note": m21.pitch.Pitch("D3"), "highest_note": m21.pitch.Pitch("D6"), "chords": []},
@@ -51,17 +55,19 @@ ALLOWED_CHORD_TYPES = [
 # Globals
 OCTAVES = [0, 1, 2, 3, 4, 5, 6]  # range of octaves to be considered when generating the chords
 CHORD_INTERVALS = ['m3', 'M3']  # chord interval building blocks
-ACCIDENTALS = ['', '#'] #, '-']  # possible accidentals to be considered
+ACCIDENTALS = ['', '#']  # , '-']  # possible accidentals to be considered
 NOTES = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
-SAMPLE_PERCENTAGE = 1.0  # this is the chord sampling rate that is used to decide whether to include a chord or not
+SAMPLE_PERCENTAGE = 0.01  # this is the chord sampling rate that is used to decide whether to include a chord or not
 SAMPLE_RATE = 22050  # [Hz]. sampling rate.
-RECORD_SEC = 1  # [sec]. duration recording audio.
+RECORD_SEC = 5  # [sec]. duration recording audio.
 DATASET_PATH = 'dataset'  # the dataset destination folder.
 MIDI_OUTPORT = 5  # check which is the output you want to send midi to
 MIDI_ON = 16 * 9
 MIDI_OFF = 16 * 8
 MIDI_ON_VELOCITY = 100
 MIDI_OFF_VELOCITY = 0
+VST3_PLUGIN_PATH = "C:\Program Files\Common Files\VST3\Kontakt.vst3"
+NUM_CHANNELS = 2
 
 
 def get_chord_inversion(chord: m21.chord.Chord, inversion: int) -> m21.chord.Chord:
@@ -83,13 +89,15 @@ def can_instrument_play_chord(chord: m21.chord.Chord, instrument: Dict) -> bool:
     :param instrument: Dict with "lower_note" and "higher_note" pitches (m21.pitch.Pitch objects)
     :return: boolean indicating if a certain chord can be played with the given instrument
     """
+
     def is_chord_in_interval(chord: m21.chord.Chord, lowest: m21.pitch.Pitch, highest: m21.pitch.Pitch) -> bool:
         return lowest <= chord.pitches[0] and highest >= chord.pitches[-1]
 
     return is_chord_in_interval(chord, instrument["lowest_note"], instrument["highest_note"])
 
 
-def prepare_chords(channels: List[Dict], octaves: List[int], notes: List[str], accidentals: List[str], chord_intervals: List[str], allowed_chord_types: List[str], verbose=False):
+def prepare_chords(channels: List[Dict], octaves: List[int], notes: List[str], accidentals: List[str],
+                   chord_intervals: List[str], allowed_chord_types: List[str], verbose=False):
     for channel in channels:
         for octave in octaves:
             for pc in notes:
@@ -113,13 +121,17 @@ def prepare_chords(channels: List[Dict], octaves: List[int], notes: List[str], a
                                     chord_inv_2 = get_chord_inversion(chord, 2)
                                     chord_inv_3 = get_chord_inversion(chord, 3)
 
-                                    if can_instrument_play_chord(chord, channel) and chord.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
+                                    if can_instrument_play_chord(chord,
+                                                                 channel) and chord.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
                                         channel["chords"] += [chord]
-                                    if can_instrument_play_chord(chord_inv_1, channel) and chord_inv_1.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
+                                    if can_instrument_play_chord(chord_inv_1,
+                                                                 channel) and chord_inv_1.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
                                         channel["chords"] += [chord_inv_1]
-                                    if can_instrument_play_chord(chord_inv_2, channel) and chord_inv_2.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
+                                    if can_instrument_play_chord(chord_inv_2,
+                                                                 channel) and chord_inv_2.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
                                         channel["chords"] += [chord_inv_2]
-                                    if can_instrument_play_chord(chord_inv_3, channel) and chord_inv_3.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
+                                    if can_instrument_play_chord(chord_inv_3,
+                                                                 channel) and chord_inv_3.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
                                         channel["chords"] += [chord_inv_3]
 
                                     chord_list = chord_list[:-1]
@@ -129,11 +141,14 @@ def prepare_chords(channels: List[Dict], octaves: List[int], notes: List[str], a
                                     chord_inv_1 = get_chord_inversion(chord, 1)
                                     chord_inv_2 = get_chord_inversion(chord, 2)
 
-                                    if can_instrument_play_chord(chord, channel) and chord.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
+                                    if can_instrument_play_chord(chord,
+                                                                 channel) and chord.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
                                         channel["chords"] += [chord]
-                                    if can_instrument_play_chord(chord_inv_1, channel) and chord_inv_1.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
+                                    if can_instrument_play_chord(chord_inv_1,
+                                                                 channel) and chord_inv_1.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
                                         channel["chords"] += [chord_inv_1]
-                                    if can_instrument_play_chord(chord_inv_2, channel) and chord_inv_2.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
+                                    if can_instrument_play_chord(chord_inv_2,
+                                                                 channel) and chord_inv_2.commonName in allowed_chord_types and random() <= SAMPLE_PERCENTAGE:
                                         channel["chords"] += [chord_inv_2]
 
                             chord_list = chord_list[:-1]
@@ -152,7 +167,7 @@ def play_chord_and_record(channels: List[Dict], save_dir: str, verbose: bool = F
                     if verbose:
                         print(chord.pitchedCommonName)
 
-                    # sned midi on
+                    # send midi on
                     midiout.send_message([MIDI_ON + channel, chord.pitches[0].midi, MIDI_ON_VELOCITY])
                     midiout.send_message([MIDI_ON + channel, chord.pitches[1].midi, MIDI_ON_VELOCITY])
                     midiout.send_message([MIDI_ON + channel, chord.pitches[2].midi, MIDI_ON_VELOCITY])
@@ -181,7 +196,48 @@ def play_chord_and_record(channels: List[Dict], save_dir: str, verbose: bool = F
                     sf.write(file=save_file_path, data=data[:, 0], samplerate=SAMPLE_RATE)
 
 
+def play_chord_and_record_pedalboard(channels: List[Dict], save_dir: str, verbose: bool = False):
+    """
+    Use https://github.com/spotify/pedalboard to render midi to a sound from a vst (kontakt)
+    """
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    plugin = load_plugin(VST3_PLUGIN_PATH)
+
+    for channel, instrument in enumerate(channels):
+        for chord in instrument["chords"]:
+            if verbose:
+                print(chord.pitchedCommonName)
+
+            midi_message = [Message("note_on", channel=channel, note=chord.pitches[0].midi, velocity=MIDI_ON_VELOCITY),
+                            Message("note_on", channel=channel, note=chord.pitches[1].midi, velocity=MIDI_ON_VELOCITY),
+                            Message("note_on", channel=channel, note=chord.pitches[2].midi, velocity=MIDI_ON_VELOCITY),
+                            Message("note_off", channel=channel, note=chord.pitches[0].midi, time=RECORD_SEC),
+                            Message("note_off", channel=channel, note=chord.pitches[1].midi, time=RECORD_SEC),
+                            Message("note_off", channel=channel, note=chord.pitches[2].midi, time=RECORD_SEC)]
+
+            if chord.seventh is not None:
+                midi_message += [
+                    Message("note_on", channel=channel, note=chord.pitches[3].midi, velocity=MIDI_ON_VELOCITY),
+                    Message("note_off", channel=channel, note=chord.pitches[3].midi, time=RECORD_SEC)
+                ]
+
+            instrument_name = instrument["name"]
+            filename = f"{instrument_name}_{chord.root().name}_{chord.root().octave}_{chord.commonName}_{chord.inversion()}.wav"
+            save_file_path = Path(save_dir, filename)
+
+            if verbose:
+                print(f"writing {save_file_path} ...")
+
+            with AudioFile(str(save_file_path), "w", SAMPLE_RATE, NUM_CHANNELS) as f:
+                f.write(plugin(midi_message,
+                               duration=RECORD_SEC,  # seconds
+                               sample_rate=SAMPLE_RATE,
+                               num_channels=NUM_CHANNELS))
+
+
 if __name__ == "__main__":
     channels = prepare_chords(CHANNELS, OCTAVES, NOTES, ACCIDENTALS, CHORD_INTERVALS, ALLOWED_CHORD_TYPES)
-    play_chord_and_record(channels, DATASET_PATH)
-
+    # play_chord_and_record(channels, DATASET_PATH)
+    play_chord_and_record_pedalboard(channels, DATASET_PATH)
